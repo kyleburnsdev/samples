@@ -20,11 +20,17 @@ RESULT=$(az rest --method "GET" \
                  --query "value[?properties.heartbeat[-1].timestamp < '${MIN_HEARTBEAT}'].{name: name, lastHeartbeat: properties.heartbeat[-1].timestamp}")
 MISSED_COUNT=$(echo $RESULT | jq length)
 
-if [ $(($MISSED_COUNT)) > 0 ]
+if [ "$MISSED_COUNT" == "0" ]
 then
+    echo "no heartbeats missed"
+else
     echo "$MISSED_COUNT is greater than 0"
     # THIS IS WHERE YOU WOULD DO SOMETHING USEFUL WITH THE RESULT SUCH AS RAISING ALERTS OR CREATING TROUBLE TICKETS
-    # NOT DEMONSTRATED IN THIS SCRIPT BECAUSE IT WILL VARY GREATLY BY ENVIRONMENT
-else
-    echo "no heartbeats missed"
+    # ILLUSTRATIVE EXAMPLE, BUT WILL VARY GREATLY BY ENVIRONMENT
+    EVENT_TIME=$(date +"%Y-%m-%dT%H:%m:00Z")
+    echo "{}" | jq '.time=$t' --arg t $EVENT_TIME \
+         | jq '.eventName="missedHeartbeatDetected"' \
+         | jq '.affectedGateways |= $r' --argjson r "$RESULT"
+    # use cUrl to post to webhook
 fi
+
