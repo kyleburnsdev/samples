@@ -15,7 +15,9 @@
 RESOURCE_GROUP=**YOUR_RESOURCE_GROUP_NAME**
 APIM_NAME=**YOUR_APIM_INSTANCE_NAME**
 MIN_HEARTBEAT=$(date +"%Y-%m-%dT%H:%m:00Z" -d "-30 minutes") #adjust to your tolerance
-RESULT=$(az rest --method GET --uri /subscriptions/{subscriptionId}/resourceGroups/${RESOURCE_GROUP}/providers/Microsoft.ApiManagement/service/${APIM_NAME}/gateways?api-version=2021-01-01-preview --query "value[?properties.heartbeat[-1].timestamp > '${MIN_HEARTBEAT}'].{name: name, lastHeartbeat: properties.heartbeat[-1].timestamp}")
+RESULT=$(az rest --method "GET" \
+                 --uri "/subscriptions/{subscriptionId}/resourceGroups/${RESOURCE_GROUP}/providers/Microsoft.ApiManagement/service/${APIM_NAME}/gateways?api-version=2021-01-01-preview" \
+                 --query "value[?properties.heartbeat[-1].timestamp < '${MIN_HEARTBEAT}'].{name: name, lastHeartbeat: properties.heartbeat[-1].timestamp}")
 MISSED_COUNT=$(echo $RESULT | jq length)
 
 if [ $(($MISSED_COUNT)) > 0 ]
