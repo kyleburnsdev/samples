@@ -1,0 +1,24 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "logicAppName": {
+      "value": "**YOUR-LOGIC-APP-NAME**"
+    },
+    "RecurrenceInterval": {
+      "value": 15
+    },
+    "paramAPIM_NAME": {
+      "value": "**YOUR-APIM-NAME**"
+    },
+    "paramHEARTBEAT_THRESHOLD_MINUTES": {
+      "value": 15
+    },
+    "paramRESOURCE_GROUP": {
+      "value": "**YOUR-APIM-RESOURCE-GROUP**"
+    },
+    "paramSUBSCRIPTION_ID": {
+      "value": "**YOUR-SUBSCRIPTION-ID**"
+    }
+  }
+}
