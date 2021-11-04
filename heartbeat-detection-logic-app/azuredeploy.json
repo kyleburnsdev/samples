@@ -1,0 +1,721 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "logicAppName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the Logic App."
+      }
+    },
+    "logicAppLocation": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Location of the Logic App."
+      }
+    },
+    "RecurrenceInterval": {
+      "type": "int",
+      "defaultValue": 15
+    },
+    "paramAPIM_NAME": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the API Management Instance to be monitored"
+      }
+    },
+    "paramHEARTBEAT_THRESHOLD_MINUTES": {
+      "type": "int",
+      "defaultValue": 15,
+      "metadata": {
+        "description": "The maximum time interval (in minutes) considered within tolerance to have not received a heartbeat"
+      }
+    },
+    "paramRESOURCE_GROUP": {
+      "type": "string",
+      "metadata": {
+        "description": "The resource group containing the APIM instance to be monitored"
+      }
+    },
+    "paramSUBSCRIPTION_ID": {
+      "type": "string",
+      "metadata":{
+        "description": "The subscription containing the APIM instance to be monitored"
+      }
+    }
+  },
+  "variables": {
+    "RecurrenceFrequency": "Minute",
+    "Retrieve_APIM_Instance-URI": "https://management.azure.com@{variables('apimResourceId')}?api-version=2021-01-01-preview",
+    "Retrieve_Gateway_Info-URI": "https://management.azure.com@{variables('apimResourceId')}/gateways?api-version=2021-01-01-preview",
+    "Management-API-Auth-Audience": "https://management.azure.com/",
+    "Metric-URI": "https://@{variables('resourceLocation')}.monitoring.azure.com@{variables('apimResourceId')}/metrics",
+    "Metric-Auth-Audience": "https://monitor.azure.com/"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Logic/workflows",
+      "apiVersion": "2016-06-01",
+      "name": "[parameters('logicAppName')]",
+      "location": "[parameters('logicAppLocation')]",
+      "dependsOn": [],
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "definition": {
+          "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+          "contentVersion": "1.0.0.0",
+          "parameters": {
+            "APIM_NAME": {
+              "defaultValue": "[parameters('paramAPIM_NAME')]",
+              "type": "String"
+            },
+            "HEARTBEAT_THRESHOLD_MINUTES": {
+              "defaultValue": "[parameters('paramHEARTBEAT_THRESHOLD_MINUTES')]",
+              "type": "Int"
+            },
+            "RESOURCE_GROUP": {
+              "defaultValue": "[parameters('paramRESOURCE_GROUP')]",
+              "type": "String"
+            },
+            "SUBSCRIPTION_ID": {
+              "defaultValue": "[parameters('paramSUBSCRIPTION_ID')]",
+              "type": "String"
+            }
+          },
+          "triggers": {
+            "Recurrence": {
+              "recurrence": {
+                "frequency": "[variables('RecurrenceFrequency')]",
+                "interval": "[parameters('RecurrenceInterval')]"
+              },
+              "type": "Recurrence"
+            }
+          },
+          "actions": {
+            "Initialize_APIM_Resource_ID": {
+              "runAfter": {},
+              "type": "InitializeVariable",
+              "inputs": {
+                "variables": [
+                  {
+                    "name": "apimResourceId",
+                    "type": "string",
+                    "value": "/subscriptions/@{parameters('SUBSCRIPTION_ID')}/resourceGroups/@{parameters('RESOURCE_GROUP')}/providers/Microsoft.ApiManagement/service/@{parameters('APIM_NAME')}"
+                  }
+                ]
+              }
+            },
+            "Initialize_Current_Heartbeat": {
+              "runAfter": {
+                "Initialize_Max_Heartbeat": [
+                  "Succeeded"
+                ]
+              },
+              "type": "InitializeVariable",
+              "inputs": {
+                "variables": [
+                  {
+                    "name": "currentHeartbeat",
+                    "type": "string"
+                  }
+                ]
+              }
+            },
+            "Initialize_Failed_Gateways": {
+              "runAfter": {
+                "Parse_Gateway_Information": [
+                  "Succeeded"
+                ]
+              },
+              "type": "InitializeVariable",
+              "inputs": {
+                "variables": [
+                  {
+                    "name": "failedGateways",
+                    "type": "array"
+                  }
+                ]
+              }
+            },
+            "Initialize_Max_Heartbeat": {
+              "runAfter": {
+                "Initialize_Succeeded_Gateways": [
+                  "Succeeded"
+                ]
+              },
+              "type": "InitializeVariable",
+              "inputs": {
+                "variables": [
+                  {
+                    "name": "currentMaximumHeartbeat",
+                    "type": "string"
+                  }
+                ]
+              }
+            },
+            "Initialize_Minimum_Expected_Heartbeat_Value": {
+              "runAfter": {
+                "Initialize_Service_Location": [
+                  "Succeeded"
+                ]
+              },
+              "type": "InitializeVariable",
+              "inputs": {
+                "variables": [
+                  {
+                    "name": "minHeartbeat",
+                    "type": "string",
+                    "value": "@{addMinutes(trigger().startTime, mul(parameters('HEARTBEAT_THRESHOLD_MINUTES'), -1))}"
+                  }
+                ]
+              }
+            },
+            "Initialize_Service_Location": {
+              "runAfter": {
+                "Parse_APIM_Service_Info": [
+                  "Succeeded"
+                ]
+              },
+              "type": "InitializeVariable",
+              "inputs": {
+                "variables": [
+                  {
+                    "name": "resourceLocation",
+                    "type": "string",
+                    "value": "@{toLower(replace(body('Parse_APIM_Service_Info')?['location'], ' ', ''))}"
+                  }
+                ]
+              }
+            },
+            "Initialize_Succeeded_Gateways": {
+              "runAfter": {
+                "Initialize_Failed_Gateways": [
+                  "Succeeded"
+                ]
+              },
+              "type": "InitializeVariable",
+              "inputs": {
+                "variables": [
+                  {
+                    "name": "succeededGateways",
+                    "type": "array"
+                  }
+                ]
+              }
+            },
+            "Parse_APIM_Service_Info": {
+              "runAfter": {
+                "Retrieve_APIM_Instance": [
+                  "Succeeded"
+                ]
+              },
+              "type": "ParseJson",
+              "inputs": {
+                "content": "@body('Retrieve_APIM_Instance')",
+                "schema": {
+                  "properties": {
+                    "etag": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "identity": {
+                      "properties": {
+                        "principalId": {
+                          "type": "string"
+                        },
+                        "tenantId": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "location": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "properties": {
+                      "properties": {
+                        "additionalLocations": {},
+                        "apiVersionConstraint": {
+                          "properties": {
+                            "minApiVersion": {}
+                          },
+                          "type": "object"
+                        },
+                        "certificates": {},
+                        "createdAtUtc": {
+                          "type": "string"
+                        },
+                        "customProperties": {
+                          "properties": {
+                            "Microsoft.WindowsAzure.ApiManagement.Gateway.Protocols.Server.Http2": {
+                              "type": "string"
+                            },
+                            "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Backend.Protocols.Ssl30": {
+                              "type": "string"
+                            },
+                            "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Backend.Protocols.Tls10": {
+                              "type": "string"
+                            },
+                            "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Backend.Protocols.Tls11": {
+                              "type": "string"
+                            },
+                            "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Ciphers.TripleDes168": {
+                              "type": "string"
+                            },
+                            "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Protocols.Ssl30": {
+                              "type": "string"
+                            },
+                            "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Protocols.Tls10": {
+                              "type": "string"
+                            },
+                            "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Protocols.Tls11": {
+                              "type": "string"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "developerPortalUrl": {
+                          "type": "string"
+                        },
+                        "disableGateway": {
+                          "type": "boolean"
+                        },
+                        "gatewayRegionalUrl": {
+                          "type": "string"
+                        },
+                        "gatewayUrl": {
+                          "type": "string"
+                        },
+                        "hostnameConfigurations": {
+                          "items": {
+                            "properties": {
+                              "certificate": {},
+                              "certificatePassword": {},
+                              "certificateSource": {
+                                "type": "string"
+                              },
+                              "certificateStatus": {},
+                              "defaultSslBinding": {
+                                "type": "boolean"
+                              },
+                              "encodedCertificate": {},
+                              "hostName": {
+                                "type": "string"
+                              },
+                              "identityClientId": {},
+                              "keyVaultId": {},
+                              "negotiateClientCertificate": {
+                                "type": "boolean"
+                              },
+                              "type": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "hostName",
+                              "encodedCertificate",
+                              "keyVaultId",
+                              "certificatePassword",
+                              "negotiateClientCertificate",
+                              "certificate",
+                              "defaultSslBinding",
+                              "identityClientId",
+                              "certificateSource",
+                              "certificateStatus"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "managementApiUrl": {
+                          "type": "string"
+                        },
+                        "notificationSenderEmail": {
+                          "type": "string"
+                        },
+                        "portalUrl": {
+                          "type": "string"
+                        },
+                        "privateEndpointConnections": {},
+                        "privateIPAddresses": {},
+                        "provisioningState": {
+                          "type": "string"
+                        },
+                        "publicIPAddresses": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "publicIpAddressId": {},
+                        "publisherEmail": {
+                          "type": "string"
+                        },
+                        "publisherName": {
+                          "type": "string"
+                        },
+                        "scmUrl": {
+                          "type": "string"
+                        },
+                        "targetProvisioningState": {
+                          "type": "string"
+                        },
+                        "virtualNetworkConfiguration": {},
+                        "virtualNetworkType": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "sku": {
+                      "properties": {
+                        "capacity": {
+                          "type": "integer"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "tags": {
+                      "properties": {},
+                      "type": "object"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "zones": {}
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "Parse_Gateway_Information": {
+              "runAfter": {
+                "Retrieve_Gateway_Info": [
+                  "Succeeded"
+                ]
+              },
+              "type": "ParseJson",
+              "inputs": {
+                "content": "@body('Retrieve_Gateway_Info')",
+                "schema": {
+                  "properties": {
+                    "count": {
+                      "type": "integer"
+                    },
+                    "value": {
+                      "items": {
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "properties": {
+                            "properties": {
+                              "description": {
+                                "type": "string"
+                              },
+                              "heartbeat": {
+                                "items": {
+                                  "properties": {
+                                    "heartbeatId": {
+                                      "type": "string"
+                                    },
+                                    "hostname": {
+                                      "type": "string"
+                                    },
+                                    "timestamp": {
+                                      "type": "string"
+                                    },
+                                    "version": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "version",
+                                    "heartbeatId",
+                                    "hostname",
+                                    "timestamp"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              },
+                              "locationData": {
+                                "properties": {
+                                  "city": {},
+                                  "countryOrRegion": {},
+                                  "district": {},
+                                  "name": {
+                                    "type": "string"
+                                  }
+                                },
+                                "type": "object"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "type": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "type",
+                          "name",
+                          "properties"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "Process_Gateway_List": {
+              "foreach": "@body('Parse_Gateway_Information')?['value']",
+              "actions": {
+                "Finding_Max_Heartbeat_for_Gateway": {
+                  "foreach": "@items('Process_Gateway_List')['properties']['heartbeat']",
+                  "actions": {
+                    "Current_Timestamp_Greater_Than_Current_Maximum": {
+                      "actions": {
+                        "Update_Current_Maximum": {
+                          "runAfter": {},
+                          "type": "SetVariable",
+                          "inputs": {
+                            "name": "currentMaximumHeartbeat",
+                            "value": "@items('Finding_Max_Heartbeat_for_Gateway')?['timestamp']"
+                          }
+                        }
+                      },
+                      "runAfter": {
+                        "Set_Current_Timestamp": [
+                          "Succeeded"
+                        ]
+                      },
+                      "expression": {
+                        "and": [
+                          {
+                            "greater": [
+                              "@variables('currentHeartbeat')",
+                              "@variables('currentMaximumHeartbeat')"
+                            ]
+                          }
+                        ]
+                      },
+                      "type": "If"
+                    },
+                    "Set_Current_Timestamp": {
+                      "runAfter": {},
+                      "type": "SetVariable",
+                      "inputs": {
+                        "name": "currentHeartbeat",
+                        "value": "@items('Finding_Max_Heartbeat_for_Gateway')?['timestamp']"
+                      }
+                    }
+                  },
+                  "runAfter": {
+                    "Reset_Current_Maximum_Heartbeat": [
+                      "Succeeded"
+                    ]
+                  },
+                  "type": "Foreach"
+                },
+                "Is_Current_Maximum_Less_Than_Expected_Minimum": {
+                  "actions": {
+                    "Add_to_Failed_Gateway_List": {
+                      "runAfter": {},
+                      "type": "AppendToArrayVariable",
+                      "inputs": {
+                        "name": "failedGateways",
+                        "value": "@items('Process_Gateway_List')?['name']"
+                      }
+                    },
+                    "Emit_Failure_Metric": {
+                      "runAfter": {
+                        "Add_to_Failed_Gateway_List": [
+                          "Succeeded"
+                        ]
+                      },
+                      "type": "Http",
+                      "inputs": {
+                        "authentication": {
+                          "audience": "[variables('Metric-Auth-Audience')]",
+                          "type": "ManagedServiceIdentity"
+                        },
+                        "body": {
+                          "data": {
+                            "baseData": {
+                              "dimNames": [
+                                "GatewayName",
+                                "Result"
+                              ],
+                              "metric": "HeartbeatDetection",
+                              "namespace": "Custom",
+                              "series": [
+                                {
+                                  "count": 1,
+                                  "dimValues": [
+                                    "@{items('Process_Gateway_List')?['name']}",
+                                    "Failure"
+                                  ],
+                                  "max": 1,
+                                  "min": 1,
+                                  "sum": 1
+                                }
+                              ]
+                            }
+                          },
+                          "time": "@{utcNow()}"
+                        },
+                        "method": "POST",
+                        "uri": "[variables('Metric-URI')]"
+                      }
+                    }
+                  },
+                  "runAfter": {
+                    "Finding_Max_Heartbeat_for_Gateway": [
+                      "Succeeded"
+                    ]
+                  },
+                  "else": {
+                    "actions": {
+                      "Add_To_Succeeded_Gateway_List": {
+                        "runAfter": {},
+                        "type": "AppendToArrayVariable",
+                        "inputs": {
+                          "name": "succeededGateways",
+                          "value": "@items('Process_Gateway_List')?['name']"
+                        }
+                      },
+                      "Emit_Success_Metric": {
+                        "runAfter": {
+                          "Add_To_Succeeded_Gateway_List": [
+                            "Succeeded"
+                          ]
+                        },
+                        "type": "Http",
+                        "inputs": {
+                          "authentication": {
+                            "audience": "[variables('Metric-Auth-Audience')]",
+                            "type": "ManagedServiceIdentity"
+                          },
+                          "body": {
+                            "data": {
+                              "baseData": {
+                                "dimNames": [
+                                  "GatewayName",
+                                  "Result"
+                                ],
+                                "metric": "HeartbeatDetection",
+                                "namespace": "Custom",
+                                "series": [
+                                  {
+                                    "count": 1,
+                                    "dimValues": [
+                                      "@{items('Process_Gateway_List')?['name']}",
+                                      "Success"
+                                    ],
+                                    "max": 1,
+                                    "min": 1,
+                                    "sum": 1
+                                  }
+                                ]
+                              }
+                            },
+                            "time": "@{utcNow()}"
+                          },
+                          "method": "POST",
+                          "uri": "[variables('Metric-URI')]"
+                        }
+                      }
+                    }
+                  },
+                  "expression": {
+                    "and": [
+                      {
+                        "less": [
+                          "@variables('currentMaximumHeartbeat')",
+                          "@variables('minHeartbeat')"
+                        ]
+                      }
+                    ]
+                  },
+                  "type": "If"
+                },
+                "Reset_Current_Maximum_Heartbeat": {
+                  "runAfter": {},
+                  "type": "SetVariable",
+                  "inputs": {
+                    "name": "currentMaximumHeartbeat",
+                    "value": "@{string('')}"
+                  }
+                }
+              },
+              "runAfter": {
+                "Initialize_Current_Heartbeat": [
+                  "Succeeded"
+                ]
+              },
+              "type": "Foreach"
+            },
+            "Retrieve_APIM_Instance": {
+              "runAfter": {
+                "Initialize_APIM_Resource_ID": [
+                  "Succeeded"
+                ]
+              },
+              "type": "Http",
+              "inputs": {
+                "authentication": {
+                  "audience": "[variables('Management-API-Auth-Audience')]",
+                  "type": "ManagedServiceIdentity"
+                },
+                "method": "GET",
+                "uri": "[variables('Retrieve_APIM_Instance-URI')]"
+              }
+            },
+            "Retrieve_Gateway_Info": {
+              "runAfter": {
+                "Initialize_Minimum_Expected_Heartbeat_Value": [
+                  "Succeeded"
+                ]
+              },
+              "type": "Http",
+              "inputs": {
+                "authentication": {
+                  "audience": "[variables('Management-API-Auth-Audience')]",
+                  "type": "ManagedServiceIdentity"
+                },
+                "method": "GET",
+                "uri": "[variables('Retrieve_Gateway_Info-URI')]"
+              }
+            }
+          },
+          "outputs": {}
+        },
+        "parameters": {}
+      }
+    }
+  ],
+  "outputs": {}
+}
