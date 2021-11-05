@@ -17,5 +17,6 @@ This is a sample Logic App demonstrating a number of concepts:
 For further information on the concepts and APIs used in this sample, see the following
 
 - [Azure Logic Apps Documentation](https://docs.microsoft.com/en-us/azure/logic-apps/)
+- [Authenticating Outbound HTTP Requests in Logic Apps](https://docs.microsoft.com/en-us/azure/logic-apps/logic-apps-securing-a-logic-app?tabs=azure-portal#add-authentication-outbound)
 - [Azure API Management REST Documentation](https://docs.microsoft.com/en-us/rest/api/apimanagement/apimanagementrest/api-management-rest)
 - [Send custom metrics for an Azure resource to the Azure Monitor metric store by using a REST API](https://docs.microsoft.com/en-us/azure/azure-monitor/essentials/metrics-store-custom-rest-api)
