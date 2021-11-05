@@ -5,6 +5,9 @@ This is a sample Logic App demonstrating a number of concepts:
 - Use of Authenticated calls to Azure REST apis
 - Emission of custom metrics to Azure Monitor
 
+> NOTE: THIS SAMPLE USES HEARTBEAT INFORMATION THAT IS INCLUDED IN THE [GET Gateways](https://docs.microsoft.com/en-us/rest/api/apimanagement/2021-04-01-preview/gateway/get)
+> REST API RESPONSE, BUT NOT INCLUDED IN THE API DOCUMENTATION AT THE TIME OF THIS WRITING.
+
 ## How to use
 
 1. Clone the repository
