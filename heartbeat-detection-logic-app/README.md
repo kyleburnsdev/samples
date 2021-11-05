@@ -37,9 +37,19 @@ The deployed logic app uses the Azure Management REST api to retrieve informatio
 
 For each self-hosted gateway instance returned by the API call, the logic app checks the heartbeats collection to determine whether its most recent heartbeat is within the range of tolerance specific by the workflow's `HEARTBEAT_THRESHOLD_MINUTES` parameter. After checking, the Azure Monitor Custom Metrics REST api is used to emit a metric indicating success or failure.
 
+### Emitted metric information
+
+The emitted metric is attached to the APIM instance, but put into a custom namespace to avoid conflicting with potential future metrics to be emitted by the product itself
+
+Metric name | HeartbeatDetection
+Metric namespace | custom
+Dimension 1 name | GatewayName
+Dimension 2 name | Result
+Dimension 2 possible values | Success, Failure
+
 ### What next
 
-By design, this logic app doesn't take any action beyond detecting missed heartbeat and producing metrics that can be consumed within Azure Monitor. The metrics can be viewed by going to your APIM instance in the Azure portal and selecting the Metrics blade. You will need to filter for a namespace of "Custom" in the Metrics blade to see the data charted. This data can be used to create an Alert rule and associated actions. See [Overview of alerts in Azure Monitor](https://docs.microsoft.com/en-us/azure/azure-monitor/alerts/alerts-overview) for more details and Alerts, Action Groups, and how to create them.
+By design, this logic app doesn't take any action beyond detecting missed heartbeat and producing metrics that can be consumed within Azure Monitor. The metrics can be viewed by going to your APIM instance in the Azure portal and selecting the Metrics blade. You will need to filter for a namespace of "custom" in the Metrics blade to see the data charted. This data can be used to create an Alert rule and associated actions. See [Overview of alerts in Azure Monitor](https://docs.microsoft.com/en-us/azure/azure-monitor/alerts/alerts-overview) for more details and Alerts, Action Groups, and how to create them.
 
 ## Further Reading
 
