@@ -41,6 +41,8 @@ For each self-hosted gateway instance returned by the API call, the logic app ch
 
 The emitted metric is attached to the APIM instance, but put into a custom namespace to avoid conflicting with potential future metrics to be emitted by the product itself
 
+ |
+----------- | ==================
 Metric name | HeartbeatDetection
 Metric namespace | custom
 Dimension 1 name | GatewayName
