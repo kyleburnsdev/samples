@@ -12,7 +12,7 @@ This is a sample Logic App demonstrating a number of concepts:
 
 1. Clone the repository
 1. Edit the parameters file to specify appropriate values for your environment
-1. Deploy the template using [az cli](https://docs.microsoft.com/en-us/azure/azure-resource-manager/templates/deployment-tutorial-local-template?tabs=azure-cli), [PowerShell Az module](https://docs.microsoft.com/en-us/azure/azure-resource-manager/templates/deployment-tutorial-local-template?tabs=azure-powershell), or [Azure Portal](https://docs.microsoft.com/en-us/azure/azure-resource-manager/templates/quickstart-create-templates-use-the-portal)
+1. Deploy the template using [az cli](https://docs.microsoft.com/en-us/azure/azure-resource-manager/templates/deployment-tutorial-local-template?tabs=azure-cli), [PowerShell Az module](https://docs.microsoft.com/en-us/azure/azure-resource-manager/templates/deployment-tutorial-local-template?tabs=azure-powershell), or [Azure Portal](https://docs.microsoft.com/en-us/azure/azure-resource-manager/templates/quickstart-create-templates-use-the-portal) [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fkyleburnsdev%2Fsamples%2Fmain%2Fheartbeat-detection-logic-app%2Fazuredeploy.json)
 1. In the Azure Portal, assign your Logic App's Managed Identity the "Monitoring Metrics Publisher" and "API Management Service Reader" roles
 
 ### Parameters
